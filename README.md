@@ -45,12 +45,14 @@ messages_for_llm = mem.view()
 
 ## Installation
 
-Zero runtime dependencies for the sliding-window pattern. Other patterns document their deps in their own docstrings.
+Zero runtime dependencies for the shipped patterns. Other patterns document their deps in their own docstrings.
 
 ```
 git clone https://github.com/jimliu741523/agent-memory-lab
 cd agent-memory-lab
-python -m patterns.sliding_window  # runs the module's built-in demo
+python -m patterns.sliding_window        # runs the module's built-in demo
+python -m patterns.summary_compression   # demo with a mock summarizer
+python -m unittest discover tests -v     # stdlib-only tests for all patterns
 ```
 
 ## Roadmap
