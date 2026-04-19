@@ -27,7 +27,7 @@ Drop-in replaceable. Your agent code doesn't change when you swap patterns.
 | Pattern | File | Status |
 |---|---|---|
 | Sliding window | `sliding_window.py` | ✅ v0, tests coming |
-| Summary compression | `summary_compression.py` | 🚧 skeleton pending |
+| Summary compression | `summary_compression.py` | ✅ v0, pluggable summarizer + mock for demo |
 | Vector retrieval | `vector_retrieval.py` | 🚧 skeleton pending |
 | Hierarchical summary | `hierarchical_summary.py` | 🚧 skeleton pending |
 | Structured episodic | `structured_episodic.py` | 🚧 skeleton pending |
