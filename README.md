@@ -67,6 +67,13 @@ A new pattern is welcome if it:
 - Comes with a docstring explaining when to use it *and when not to*
 - Has at least one test in `tests/`
 
+## Related
+
+- [`agentic-anti-patterns`](https://github.com/jimliu741523/agentic-anti-patterns) catalogs agent failure modes; the patterns in this repo are concrete mitigations for:
+  - [AP-05 Context bloat → cost explosion](https://github.com/jimliu741523/agentic-anti-patterns#ap-05--context-bloat--cost-explosion) — sliding-window and summary-compression bound the context; hierarchical summary (planned) handles very long sessions
+  - [AP-08 Memory poisoning](https://github.com/jimliu741523/agentic-anti-patterns#ap-08--memory-poisoning) — provenance-tagging and trust-tier authorization would apply to any of the stores here
+- [`self-evolving-agent`](https://github.com/jimliu741523/self-evolving-agent) — sibling experiment in agent self-improvement; shares the pluggable-callable design (this repo for `summarize_fn`, self-evolving-agent for `ModelFn`).
+
 ## License
 
 MIT.
