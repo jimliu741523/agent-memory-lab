@@ -12,6 +12,11 @@ from patterns.summary_compression import (
     Message as SCMessage,
     _mock_summarize,
 )
+from patterns.hierarchical_summary import (
+    HierarchicalSummary,
+    Message as HSMessage,
+    _mock_summarize as _mock_hs,
+)
 
 
 class TestSlidingWindow(unittest.TestCase):
@@ -102,6 +107,76 @@ class TestSummaryCompression(unittest.TestCase):
         view = mem.view()
         has_summary = any("previous_summary" in m.content for m in view)
         self.assertFalse(has_summary)
+
+
+class TestHierarchicalSummary(unittest.TestCase):
+    def test_no_rollup_under_threshold(self):
+        mem = HierarchicalSummary(
+            summarize=_mock_hs, leaf_chunk=5, fanout=3, keep_recent=2
+        )
+        for i in range(5):
+            mem.add(HSMessage("user", f"m{i}"))
+        # not enough overflow beyond keep_recent to trigger a rollup
+        self.assertEqual(len(mem._hierarchy), 0)
+
+    def test_rollup_triggers_l1(self):
+        mem = HierarchicalSummary(
+            summarize=_mock_hs, leaf_chunk=3, fanout=10, keep_recent=1
+        )
+        for i in range(10):
+            mem.add(HSMessage("user", f"m{i}"))
+        # at least one L1 summary must exist at hierarchy index 0
+        self.assertGreater(len(mem._hierarchy), 0)
+        self.assertGreater(len(mem._hierarchy[0]), 0)
+        # its content carries the L1 marker
+        self.assertIn("L1_summary", mem._hierarchy[0][0].content)
+
+    def test_cascades_to_higher_levels(self):
+        import re
+
+        mem = HierarchicalSummary(
+            summarize=_mock_hs, leaf_chunk=2, fanout=2, keep_recent=1
+        )
+        for i in range(20):
+            mem.add(HSMessage("user", f"m{i}"))
+
+        # enough messages with fanout=2 MUST produce at least one L2+ summary
+        # somewhere. The rolled-up summary may itself have cascaded further,
+        # so we can't assume level[1] holds it; check all non-empty levels.
+        levels_seen: set[int] = set()
+        for level in mem._hierarchy:
+            for msg in level:
+                for match in re.finditer(r"<L(\d+)_summary>", msg.content):
+                    levels_seen.add(int(match.group(1)))
+        self.assertTrue(
+            any(l >= 2 for l in levels_seen),
+            f"no L2+ summary after cascade; saw only {sorted(levels_seen)}",
+        )
+
+    def test_system_preserved_and_order(self):
+        mem = HierarchicalSummary(
+            summarize=_mock_hs, leaf_chunk=2, fanout=2, keep_recent=1
+        )
+        mem.add(HSMessage("system", "sys"))
+        for i in range(10):
+            mem.add(HSMessage("user", f"m{i}"))
+        view = mem.view()
+        self.assertEqual(view[0].role, "system")
+        self.assertEqual(view[0].content, "sys")
+        # last message in view must be a recent raw user message
+        self.assertEqual(view[-1].role, "user")
+
+    def test_keep_recent_always_verbatim_at_tail(self):
+        mem = HierarchicalSummary(
+            summarize=_mock_hs, leaf_chunk=3, fanout=5, keep_recent=2
+        )
+        for i in range(10):
+            mem.add(HSMessage("user", f"m{i}"))
+        view = mem.view()
+        # last keep_recent items are raw user messages with the most recent content
+        tail = view[-2:]
+        self.assertTrue(all(m.role == "user" for m in tail))
+        self.assertEqual(tail[-1].content, "m9")
 
 
 if __name__ == "__main__":

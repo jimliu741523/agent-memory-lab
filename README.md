@@ -11,7 +11,7 @@ Agent memory is usually discussed at two unhelpful extremes: "just stuff everyth
 | 1 | [Sliding window](./patterns/sliding_window.py) | Short tasks, cheapest, forgets anything older than N turns | ✅ v0 |
 | 2 | [Summary compression](./patterns/summary_compression.py) | Long tasks where you can afford one summarization pass per K turns | ✅ v0 |
 | 3 | [Vector retrieval](./patterns/vector_retrieval.py) | Large knowledge base; you need the *relevant* turns, not the *recent* turns | 🚧 |
-| 4 | [Hierarchical summary](./patterns/hierarchical_summary.py) | Very long sessions; build a pyramid of summaries | 🚧 |
+| 4 | [Hierarchical summary](./patterns/hierarchical_summary.py) | Very long sessions; build a pyramid of summaries that degrade gracefully with age | ✅ v0 |
 | 5 | [Structured episodic](./patterns/structured_episodic.py) | Multi-session agents; store "episodes" as structured records, query by attribute | 🚧 |
 
 ## Design principles
@@ -52,7 +52,8 @@ git clone https://github.com/jimliu741523/agent-memory-lab
 cd agent-memory-lab
 python -m patterns.sliding_window        # runs the module's built-in demo
 python -m patterns.summary_compression   # demo with a mock summarizer
-python -m unittest discover tests -v     # stdlib-only tests for all patterns
+python -m patterns.hierarchical_summary  # pyramid of rolling summaries demo
+python -m unittest discover tests -v     # stdlib-only tests for all patterns (13/13)
 ```
 
 ## Roadmap
