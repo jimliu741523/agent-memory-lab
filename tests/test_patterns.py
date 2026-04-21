@@ -17,6 +17,11 @@ from patterns.hierarchical_summary import (
     Message as HSMessage,
     _mock_summarize as _mock_hs,
 )
+from patterns.vector_retrieval import (
+    VectorRetrieval,
+    Message as VRMessage,
+    _hash_bow_embed,
+)
 
 
 class TestSlidingWindow(unittest.TestCase):
@@ -177,6 +182,66 @@ class TestHierarchicalSummary(unittest.TestCase):
         tail = view[-2:]
         self.assertTrue(all(m.role == "user" for m in tail))
         self.assertEqual(tail[-1].content, "m9")
+
+
+class TestVectorRetrieval(unittest.TestCase):
+    def test_view_returns_system_plus_recent(self):
+        mem = VectorRetrieval(embed=_hash_bow_embed, keep_recent=3)
+        mem.add(VRMessage("system", "sys"))
+        for i in range(5):
+            mem.add(VRMessage("user", f"m{i}"))
+        view = mem.view()
+        self.assertEqual(view[0].role, "system")
+        # last 3 recent are kept
+        self.assertEqual([m.content for m in view[1:]], ["m2", "m3", "m4"])
+
+    def test_oldest_archived_after_overflow(self):
+        mem = VectorRetrieval(embed=_hash_bow_embed, keep_recent=2)
+        for i in range(5):
+            mem.add(VRMessage("user", f"m{i}"))
+        # 5 added, 2 recent remain, 3 archived
+        self.assertEqual(len(mem._recent), 2)
+        self.assertEqual(len(mem._archive), 3)
+        # archived contents are the oldest 3
+        archived_contents = [pair[0].content for pair in mem._archive]
+        self.assertEqual(archived_contents, ["m0", "m1", "m2"])
+
+    def test_query_returns_most_similar(self):
+        mem = VectorRetrieval(embed=_hash_bow_embed, keep_recent=1)
+        mem.add(VRMessage("user", "python garbage collection uses reference counting"))
+        mem.add(VRMessage("user", "rust borrow checker prevents data races"))
+        mem.add(VRMessage("user", "javascript has mark and sweep gc"))
+        mem.add(VRMessage("user", "dummy recent"))  # kept in _recent, not in archive
+
+        # python-related query should surface the python message from archive
+        hits = mem.query("python memory management", k=1)
+        self.assertEqual(len(hits), 1)
+        self.assertIn("python", hits[0].content)
+
+    def test_query_empty_archive_returns_empty_list(self):
+        mem = VectorRetrieval(embed=_hash_bow_embed, keep_recent=10)
+        mem.add(VRMessage("user", "hi"))
+        self.assertEqual(mem.query("anything", k=3), [])
+
+    def test_query_does_not_return_recent_or_system(self):
+        mem = VectorRetrieval(embed=_hash_bow_embed, keep_recent=2)
+        mem.add(VRMessage("system", "python context"))  # system, should never appear in query
+        mem.add(VRMessage("user", "archive python old"))
+        mem.add(VRMessage("user", "recent one"))  # in recent
+        mem.add(VRMessage("user", "recent two python"))  # in recent — but python-ish
+        hits = mem.query("python", k=5)
+        # only archived items come back; recent/system are not eligible
+        for m in hits:
+            self.assertNotEqual(m.role, "system")
+            self.assertNotIn(m.content, ["recent one", "recent two python"])
+
+    def test_hash_embed_is_deterministic(self):
+        a = _hash_bow_embed("hello world")
+        b = _hash_bow_embed("hello world")
+        self.assertEqual(a, b)
+        # different text should differ
+        c = _hash_bow_embed("completely other tokens")
+        self.assertNotEqual(a, c)
 
 
 if __name__ == "__main__":
