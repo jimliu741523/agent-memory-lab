@@ -22,6 +22,11 @@ from patterns.vector_retrieval import (
     Message as VRMessage,
     _hash_bow_embed,
 )
+from patterns.structured_episodic import (
+    StructuredEpisodic,
+    Message as SEMessage,
+    Episode,
+)
 
 
 class TestSlidingWindow(unittest.TestCase):
@@ -242,6 +247,91 @@ class TestVectorRetrieval(unittest.TestCase):
         # different text should differ
         c = _hash_bow_embed("completely other tokens")
         self.assertNotEqual(a, c)
+
+
+class TestStructuredEpisodic(unittest.TestCase):
+    def _seed(self) -> StructuredEpisodic:
+        mem = StructuredEpisodic(keep_recent=5)
+        mem.record_episode(
+            situation={"task": "deploy", "env": "prod", "tests": "green"},
+            action="deploy",
+            outcome="clean",
+            tags=("safe-path",),
+        )
+        mem.record_episode(
+            situation={"task": "deploy", "env": "prod", "tests": "red"},
+            action="override",
+            outcome="rollback",
+            tags=("incident", "lesson"),
+        )
+        mem.record_episode(
+            situation={"task": "deploy", "env": "staging", "tests": "red"},
+            action="repro",
+            outcome="fix found",
+            tags=("debug",),
+        )
+        return mem
+
+    def test_view_returns_system_plus_recent_tail(self):
+        mem = StructuredEpisodic(keep_recent=2)
+        mem.add(SEMessage("system", "sys"))
+        for i in range(5):
+            mem.add(SEMessage("user", f"m{i}"))
+        view = mem.view()
+        self.assertEqual(view[0].role, "system")
+        self.assertEqual([m.content for m in view[1:]], ["m3", "m4"])
+
+    def test_record_returns_episode_and_stores_it(self):
+        mem = StructuredEpisodic()
+        ep = mem.record_episode(
+            situation={"task": "index"}, action="ran", outcome="ok"
+        )
+        self.assertIsInstance(ep, Episode)
+        self.assertEqual(len(mem._episodes), 1)
+
+    def test_recall_ranks_exact_situation_match_highest(self):
+        mem = self._seed()
+        hits = mem.recall_episodes(
+            situation={"task": "deploy", "env": "prod", "tests": "red"}, k=3
+        )
+        # top hit must be the exact (prod, red) episode
+        self.assertEqual(hits[0].outcome, "rollback")
+
+    def test_recall_by_tag_only(self):
+        mem = self._seed()
+        hits = mem.recall_episodes(tags=("incident",), k=5)
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].outcome, "rollback")
+
+    def test_recall_empty_returns_empty(self):
+        mem = StructuredEpisodic()
+        self.assertEqual(
+            mem.recall_episodes(situation={"task": "deploy"}), []
+        )
+
+    def test_recall_skips_nonmatching_when_query_given(self):
+        mem = self._seed()
+        # a totally unrelated situation with no overlapping keys or tags -> no hits
+        hits = mem.recall_episodes(
+            situation={"task": "train", "dataset": "imagenet"},
+            tags=("ml",),
+        )
+        self.assertEqual(hits, [])
+
+    def test_recency_breaks_ties_at_equal_score(self):
+        mem = StructuredEpisodic()
+        # three episodes, each matches one key -> all score 1
+        mem.record_episode(
+            situation={"task": "deploy"}, action="a1", outcome="old"
+        )
+        mem.record_episode(
+            situation={"task": "deploy"}, action="a2", outcome="mid"
+        )
+        mem.record_episode(
+            situation={"task": "deploy"}, action="a3", outcome="new"
+        )
+        hits = mem.recall_episodes(situation={"task": "deploy"}, k=3)
+        self.assertEqual([h.outcome for h in hits], ["new", "mid", "old"])
 
 
 if __name__ == "__main__":

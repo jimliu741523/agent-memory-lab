@@ -30,7 +30,7 @@ Drop-in replaceable. Your agent code doesn't change when you swap patterns.
 | Summary compression | `summary_compression.py` | ✅ v0, pluggable summarizer + mock for demo |
 | Vector retrieval | `vector_retrieval.py` | ✅ v0, pluggable embedder + stdlib hash-BOW fallback |
 | Hierarchical summary | `hierarchical_summary.py` | ✅ v0, pyramid rollup with cascading fanout |
-| Structured episodic | `structured_episodic.py` | 🚧 skeleton pending |
+| Structured episodic | `structured_episodic.py` | ✅ v0, typed `Episode(situation, action, outcome, tags)` with structured-key recall |
 
 ## Design rules
 
