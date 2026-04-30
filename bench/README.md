@@ -1,6 +1,6 @@
 # Benchmark
 
-**Status: plan only.** The harness doesn't exist yet; this file is the spec so the first implementation has a target.
+**Status: v0 implemented** in [`run.py`](./run.py). Latest results: [`results/results.md`](./results/results.md). This file documents the spec; the harness now matches it.
 
 ## The task
 

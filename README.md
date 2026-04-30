@@ -21,15 +21,27 @@ Agent memory is usually discussed at two unhelpful extremes: "just stuff everyth
 - **Same interface for all patterns** (`add(msg)`, `view() -> list[Message]`) so swapping is one line.
 - **Tests over docs.** If a pattern needs paragraphs of prose to explain behavior, it's not minimal yet.
 
-## Benchmark (coming)
+## Benchmark
 
-See [`bench/`](./bench/) for the plan. Rough idea: a fixed multi-turn agent task where the ground truth requires information introduced at turn 3 and recalled at turn 50. Each memory pattern gets the same task; we measure:
+A 50-turn recall micro-bench (deterministic, stdlib-only, no network) is in [`bench/run.py`](./bench/run.py). A target fact is injected at turn 3; each pattern is asked to surface it at the end. Latest run ([`bench/results/results.md`](./bench/results/results.md)):
 
-- **Recall accuracy** — did the right info survive to turn 50?
-- **Tokens per turn** — cost proxy.
-- **Latency overhead** — some patterns add a summarization or embedding call per turn.
+| pattern | recall (turn-3 fact) | final-context chars | extra callback calls |
+|---|---|---|---|
+| sliding_window | no | 303 | 0 |
+| summary_compression | no | 1451 | 7 |
+| hierarchical_summary | no | 225 | 13 |
+| vector_retrieval | **yes** | 303 | 87 (one embed per archived msg) |
+| structured_episodic | **yes** | 303 | 0 |
 
-Benchmarks will be reproducible with `python bench/run.py --pattern sliding_window`.
+Reads as expected: the recency-only patterns drop the early fact; the two patterns with explicit recall (`query()` and `recall_episodes()`) surface it on demand. `summary_compression` keeps a longer rolling buffer but didn't preserve the specific token. `hierarchical_summary` compresses the most aggressively. The numbers are not a horse race — they make the *tradeoff* between recall, context cost, and per-turn callback work concrete.
+
+```
+python -m bench.run                            # all patterns, table to stdout
+python -m bench.run --pattern sliding_window   # one pattern only
+python -m bench.run --output bench/results/results.md
+```
+
+This is a micro-bench for legibility, not a ranking. It's not designed to argue any pattern is "best" — only to show the shape of each pattern's compromise.
 
 ## Quickstart
 
