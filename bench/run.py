@@ -31,6 +31,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import random
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,14 +66,17 @@ from patterns.structured_episodic import (
 TARGET_FACT = "launch code is ALPHA-7742"
 
 
-def build_script() -> list[tuple[str, str]]:
+def build_script(seed: int = 0) -> list[tuple[str, str]]:
     """
     Fifty turns. Turn 3 (user) carries the target fact. Turns 4..49 are
-    filler. Turn 50 asks the recall question.
+    filler whose order is determined by `seed` — same seed yields the
+    same script, different seeds shuffle the filler sequence (useful
+    for measuring variance across runs).
 
     Returns a list of (role, content) — role strings are the shared
     Message Role Literal for every pattern.
     """
+    rng = random.Random(seed)
     script: list[tuple[str, str]] = [
         ("system", "you are a helpful assistant for operations"),
         ("user", "hello, we need to coordinate a launch today"),
@@ -89,8 +93,9 @@ def build_script() -> list[tuple[str, str]]:
         "rewrite this paragraph in a formal tone",
         "list three risks for a new microservice",
     ]
+    order = [rng.randrange(len(fillers)) for _ in range(46)]
     for i in range(46):
-        user = fillers[i % len(fillers)]
+        user = fillers[order[i]]
         script.append(("user", f"{user} (turn {i + 5})"))
         script.append(("assistant", f"ack (turn {i + 5})"))
     # Recall question at turn 50 (stored but not asked of the model —
@@ -265,9 +270,15 @@ def main() -> int:
         default=None,
         help="write the rendered markdown table to this path as well as stdout",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="filler-order seed; same seed = same script (default: 0)",
+    )
     args = parser.parse_args()
 
-    script = build_script()
+    script = build_script(seed=args.seed)
     names = list(RUNNERS) if args.pattern == "all" else [args.pattern]
     results = [RUNNERS[name](script) for name in names]
 
