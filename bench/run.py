@@ -276,14 +276,50 @@ def main() -> int:
         default=0,
         help="filler-order seed; same seed = same script (default: 0)",
     )
+    parser.add_argument(
+        "--multi-seed",
+        type=int,
+        default=1,
+        help="run N seeds (0..N-1) and report recall counts + char range per pattern",
+    )
     args = parser.parse_args()
 
-    script = build_script(seed=args.seed)
     names = list(RUNNERS) if args.pattern == "all" else [args.pattern]
+
+    if args.multi_seed > 1:
+        # aggregate across seeds 0..N-1
+        from collections import defaultdict
+
+        recall_counts: dict[str, int] = defaultdict(int)
+        char_ranges: dict[str, list[int]] = defaultdict(list)
+        for s in range(args.multi_seed):
+            script = build_script(seed=s)
+            for name in names:
+                r = RUNNERS[name](script)
+                if r.recall_raw:
+                    recall_counts[name] += 1
+                char_ranges[name].append(r.context_chars)
+
+        print(
+            f"# agent-memory-lab recall bench — multi-seed (N={args.multi_seed})\n"
+        )
+        print(
+            "| pattern | recall pass-rate | context chars (min/avg/max) |\n"
+            "|---|---|---|"
+        )
+        for name in names:
+            cr = char_ranges[name]
+            avg = sum(cr) // len(cr)
+            print(
+                f"| {name} | {recall_counts[name]}/{args.multi_seed} | {min(cr)}/{avg}/{max(cr)} |"
+            )
+        return 0
+
+    script = build_script(seed=args.seed)
     results = [RUNNERS[name](script) for name in names]
 
     rendered = render(results)
-    print(f"# agent-memory-lab recall bench ({len(script)} turns, target fact at turn 3)\n")
+    print(f"# agent-memory-lab recall bench ({len(script)} turns, target fact at turn 3, seed={args.seed})\n")
     print(rendered)
 
     if args.output:
