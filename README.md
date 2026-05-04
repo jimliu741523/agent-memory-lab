@@ -45,15 +45,35 @@ This is a micro-bench for legibility, not a ranking. It's not designed to argue 
 
 ## Quickstart
 
+Single pattern (any of the five — same interface):
+
 ```python
-from patterns.sliding_window import SlidingWindow, Message
+from patterns import SlidingWindow, Message
 
 mem = SlidingWindow(window=20)
 mem.add(Message(role="user", content="hello"))
 mem.add(Message(role="assistant", content="hi"))
-# ... later ...
 messages_for_llm = mem.view()
 ```
+
+Composed (recent + topic recall — the production shape, see [`examples/compose.py`](./examples/compose.py)):
+
+```python
+from patterns import SlidingWindow, VectorRetrieval, Message
+from patterns.vector_retrieval import _hash_bow_embed
+
+recent = SlidingWindow(window=20)
+archive = VectorRetrieval(embed=_hash_bow_embed, keep_recent=0)
+
+def add(msg):
+    recent.add(msg); archive.add(msg)
+
+# add(...) for a long conversation, then:
+context = recent.view()                          # what the LLM sees
+extra   = archive.query("specific old fact", k=3)  # topical recall on demand
+```
+
+The two return the same `Message` shape, so concatenating `context + extra` is one line.
 
 ## Installation
 
