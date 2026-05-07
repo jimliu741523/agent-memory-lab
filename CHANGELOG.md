@@ -2,6 +2,9 @@
 
 Newest on top. Tracks user-visible changes to patterns, the bench, and the test suite. Cosmetic doc edits are not logged.
 
+## 2026-05-07
+- **`examples/tool_output_shim.py`** added — demonstrates using `SummaryCompression` as a two-level tool-output filter (per-call compaction + rolling rollup) to mitigate AP-22 (context pollution from raw tool output). Shows 88%+ per-call reduction and rolling context cap across a 10-call debugging session; pairs with the AP-22 entry in `agentic-anti-patterns`.
+
 ## 2026-05-04
 - **`bench/run.py --multi-seed N`** added — aggregate recall pass-rate and char range across N filler shuffles. 10-seed run confirms recall behaviour is stable: vector_retrieval and structured_episodic hit 10/10, recency-only patterns 0/10.
 - **`bench/run.py --seed`** added — reproducible filler shuffling. Same seed = same script.
