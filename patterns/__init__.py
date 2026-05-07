@@ -34,6 +34,7 @@ from patterns.summary_compression import SummaryCompression
 from patterns.hierarchical_summary import HierarchicalSummary
 from patterns.vector_retrieval import VectorRetrieval
 from patterns.structured_episodic import StructuredEpisodic, Episode
+from patterns.memory_writer import MemoryWriter, WriteOutcome, ListBackend
 
 __all__ = [
     "SlidingWindow",
@@ -42,5 +43,8 @@ __all__ = [
     "VectorRetrieval",
     "StructuredEpisodic",
     "Episode",
+    "MemoryWriter",
+    "WriteOutcome",
+    "ListBackend",
     "Message",
 ]

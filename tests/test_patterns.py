@@ -334,5 +334,175 @@ class TestStructuredEpisodic(unittest.TestCase):
         self.assertEqual([h.outcome for h in hits], ["new", "mid", "old"])
 
 
+class TestMemoryWriter(unittest.TestCase):
+    """Tests for patterns.memory_writer.MemoryWriter (RP-3)."""
+
+    def _make_backend(self):
+        from patterns.memory_writer import ListBackend
+        return ListBackend()
+
+    def _make_msg(self, role, content):
+        from patterns.memory_writer import Message
+        return Message(role, content)
+
+    def _make_mw(self, **kwargs):
+        from patterns.memory_writer import MemoryWriter
+        return MemoryWriter(backend=self._make_backend(), **kwargs)
+
+    def test_default_commits_message(self):
+        from patterns.memory_writer import WriteOutcome
+        mw = self._make_mw()
+        out = mw.add(self._make_msg("user", "hello"))
+        self.assertEqual(out, WriteOutcome.COMMITTED)
+        self.assertEqual(len(mw.view()), 1)
+
+    def test_system_always_committed(self):
+        from patterns.memory_writer import WriteOutcome
+        def _zero_salience(msg, ctx):
+            return 0.0
+        mw = self._make_mw(salience_fn=_zero_salience, salience_threshold=0.5)
+        out = mw.add(self._make_msg("system", "be helpful"))
+        self.assertEqual(out, WriteOutcome.COMMITTED)
+        self.assertIn("be helpful", [m.content for m in mw.view()])
+
+    def test_low_salience_drops_message(self):
+        from patterns.memory_writer import WriteOutcome
+        def _low(msg, ctx):
+            return 0.1
+        mw = self._make_mw(salience_fn=_low, salience_threshold=0.5)
+        out = mw.add(self._make_msg("user", "boring"))
+        self.assertEqual(out, WriteOutcome.DROPPED_LOW_SALIENCE)
+        self.assertEqual(mw.view(), [])
+
+    def test_high_salience_passes_through(self):
+        from patterns.memory_writer import WriteOutcome
+        def _high(msg, ctx):
+            return 1.0
+        mw = self._make_mw(salience_fn=_high, salience_threshold=0.5)
+        out = mw.add(self._make_msg("user", "important"))
+        self.assertEqual(out, WriteOutcome.COMMITTED)
+        self.assertEqual(len(mw.view()), 1)
+
+    def test_latest_wins_suppresses_old_contradicting_message(self):
+        from patterns.memory_writer import Message, WriteOutcome
+        M = self._make_msg
+        old_msg = M("user", "sky is green")
+
+        def _contradicts(msg, ctx):
+            for m in ctx:
+                if "sky is" in m.content and m.content != msg.content:
+                    return m
+            return None
+
+        mw = self._make_mw(contradict_fn=_contradicts, resolution="latest_wins")
+        mw.add(old_msg)
+        out = mw.add(M("user", "sky is blue"))
+        self.assertEqual(out, WriteOutcome.FLAGGED_CONTRADICTION)
+        contents = [m.content for m in mw.view()]
+        self.assertIn("sky is blue", contents)
+        self.assertNotIn("sky is green", contents)
+
+    def test_merge_resolution_produces_merged_message(self):
+        from patterns.memory_writer import Message, WriteOutcome
+        M = self._make_msg
+
+        def _contradicts(msg, ctx):
+            for m in ctx:
+                if "sky is" in m.content and m.content != msg.content:
+                    return m
+            return None
+
+        def _merge(new, old):
+            return Message(new.role, f"[merged] {old.content} + {new.content}")
+
+        mw = self._make_mw(
+            contradict_fn=_contradicts,
+            merge_fn=_merge,
+            resolution="merge",
+        )
+        mw.add(M("user", "sky is green"))
+        out = mw.add(M("user", "sky is blue"))
+        self.assertEqual(out, WriteOutcome.MERGED)
+        contents = [m.content for m in mw.view()]
+        self.assertTrue(any("[merged]" in c for c in contents))
+        self.assertNotIn("sky is green", contents)
+
+    def test_flag_for_review_holds_message(self):
+        from patterns.memory_writer import WriteOutcome
+        M = self._make_msg
+
+        def _contradicts(msg, ctx):
+            for m in ctx:
+                if "sky is" in m.content and m.content != msg.content:
+                    return m
+            return None
+
+        mw = self._make_mw(contradict_fn=_contradicts, resolution="flag_for_review")
+        mw.add(M("user", "sky is green"))
+        out = mw.add(M("user", "sky is blue"))
+        self.assertEqual(out, WriteOutcome.HELD_FOR_REVIEW)
+        self.assertEqual(len(mw.held), 1)
+        self.assertEqual(mw.held[0].content, "sky is blue")
+        self.assertNotIn("sky is blue", [m.content for m in mw.view()])
+
+    def test_release_promotes_held_message(self):
+        from patterns.memory_writer import WriteOutcome
+        M = self._make_msg
+
+        def _contradicts(msg, ctx):
+            return ctx[0] if ctx else None
+
+        mw = self._make_mw(contradict_fn=_contradicts, resolution="flag_for_review")
+        mw.add(M("user", "first"))
+        mw.add(M("user", "second"))
+        held = mw.held[0]
+        out = mw.release(held)
+        self.assertEqual(out, WriteOutcome.COMMITTED)
+        self.assertEqual(len(mw.held), 0)
+        self.assertIn(held.content, [m.content for m in mw.view()])
+
+    def test_discard_drops_held_message(self):
+        M = self._make_msg
+
+        def _contradicts(msg, ctx):
+            return ctx[0] if ctx else None
+
+        mw = self._make_mw(contradict_fn=_contradicts, resolution="flag_for_review")
+        mw.add(M("user", "first"))
+        mw.add(M("user", "second"))
+        held = mw.held[0]
+        mw.discard(held)
+        self.assertEqual(len(mw.held), 0)
+        self.assertNotIn(held.content, [m.content for m in mw.view()])
+
+    def test_ttl_expires_old_messages(self):
+        mw = self._make_mw(ttl=2)
+        M = self._make_msg
+        for i in range(5):
+            mw.add(M("user", f"turn {i}"))
+        visible = [m.content for m in mw.view()]
+        self.assertIn("turn 4", visible)
+        self.assertIn("turn 3", visible)
+        self.assertNotIn("turn 0", visible)
+        self.assertNotIn("turn 1", visible)
+        self.assertNotIn("turn 2", visible)
+
+    def test_ttl_zero_keeps_all_messages(self):
+        mw = self._make_mw(ttl=0)
+        M = self._make_msg
+        for i in range(5):
+            mw.add(M("user", f"turn {i}"))
+        self.assertEqual(len(mw.view()), 5)
+
+    def test_ttl_preserves_system_messages(self):
+        mw = self._make_mw(ttl=1)
+        M = self._make_msg
+        mw.add(M("system", "always here"))
+        for i in range(5):
+            mw.add(M("user", f"turn {i}"))
+        visible = [m.content for m in mw.view()]
+        self.assertIn("always here", visible)
+
+
 if __name__ == "__main__":
     unittest.main()
