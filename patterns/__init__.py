@@ -35,6 +35,7 @@ from patterns.hierarchical_summary import HierarchicalSummary
 from patterns.vector_retrieval import VectorRetrieval
 from patterns.structured_episodic import StructuredEpisodic, Episode
 from patterns.memory_writer import MemoryWriter, WriteOutcome, ListBackend
+from patterns.checkpoint import CheckpointManager, RunState, MemoryBackend, FileBackend
 
 __all__ = [
     "SlidingWindow",
@@ -47,4 +48,8 @@ __all__ = [
     "WriteOutcome",
     "ListBackend",
     "Message",
+    "CheckpointManager",
+    "RunState",
+    "MemoryBackend",
+    "FileBackend",
 ]
