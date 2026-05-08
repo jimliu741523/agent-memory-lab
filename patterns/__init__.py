@@ -64,6 +64,15 @@ from patterns.agent_coord import (
     Barrier,
     DriftMonitor,
 )
+from patterns.agent_guard import (
+    AgentGuard,
+    BudgetGate,
+    NoProgressDetector,
+    ProgressStatus,
+    RateLimitRetrier,
+    ToolCallValidator,
+    ValidationResult,
+)
 
 __all__ = [
     "SlidingWindow",
@@ -102,4 +111,11 @@ __all__ = [
     "EventBus",
     "Barrier",
     "DriftMonitor",
+    "AgentGuard",
+    "BudgetGate",
+    "NoProgressDetector",
+    "ProgressStatus",
+    "RateLimitRetrier",
+    "ToolCallValidator",
+    "ValidationResult",
 ]
