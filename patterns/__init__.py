@@ -78,6 +78,13 @@ from patterns.mcp_pipe import (
     McpPipe,
     ResultHandle,
 )
+from patterns.tool_schema_compiler import (
+    CompiledSchema,
+    ModelProfile,
+    OperatorType,
+    SchemaValidationError,
+    ToolSchemaCompiler,
+)
 
 __all__ = [
     "SlidingWindow",
@@ -126,4 +133,9 @@ __all__ = [
     "HandleStore",
     "McpPipe",
     "ResultHandle",
+    "CompiledSchema",
+    "ModelProfile",
+    "OperatorType",
+    "SchemaValidationError",
+    "ToolSchemaCompiler",
 ]
