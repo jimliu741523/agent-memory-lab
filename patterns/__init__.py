@@ -47,6 +47,15 @@ from patterns.tool_fence import (
     task_alignment_rule,
     deobfuscate,
 )
+from patterns.agent_tx import (
+    CompensationEntry,
+    MemorySagaBackend,
+    SQLiteSagaBackend,
+    SagaBackend,
+    SagaLog,
+    compensable,
+    run_saga,
+)
 
 __all__ = [
     "SlidingWindow",
@@ -72,4 +81,11 @@ __all__ = [
     "sensitive_path_rule",
     "task_alignment_rule",
     "deobfuscate",
+    "CompensationEntry",
+    "MemorySagaBackend",
+    "SQLiteSagaBackend",
+    "SagaBackend",
+    "SagaLog",
+    "compensable",
+    "run_saga",
 ]
