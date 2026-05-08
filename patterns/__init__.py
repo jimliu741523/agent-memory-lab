@@ -56,6 +56,14 @@ from patterns.agent_tx import (
     compensable,
     run_saga,
 )
+from patterns.agent_coord import (
+    FileLock,
+    WorkQueue,
+    Task,
+    EventBus,
+    Barrier,
+    DriftMonitor,
+)
 
 __all__ = [
     "SlidingWindow",
@@ -88,4 +96,10 @@ __all__ = [
     "SagaLog",
     "compensable",
     "run_saga",
+    "FileLock",
+    "WorkQueue",
+    "Task",
+    "EventBus",
+    "Barrier",
+    "DriftMonitor",
 ]
