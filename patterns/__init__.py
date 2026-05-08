@@ -36,6 +36,17 @@ from patterns.vector_retrieval import VectorRetrieval
 from patterns.structured_episodic import StructuredEpisodic, Episode
 from patterns.memory_writer import MemoryWriter, WriteOutcome, ListBackend
 from patterns.checkpoint import CheckpointManager, RunState, MemoryBackend, FileBackend
+from patterns.tool_fence import (
+    Action,
+    ToolFence,
+    Verdict,
+    RuleFn,
+    block_pattern_rule,
+    warn_pattern_rule,
+    sensitive_path_rule,
+    task_alignment_rule,
+    deobfuscate,
+)
 
 __all__ = [
     "SlidingWindow",
@@ -52,4 +63,13 @@ __all__ = [
     "RunState",
     "MemoryBackend",
     "FileBackend",
+    "Action",
+    "ToolFence",
+    "Verdict",
+    "RuleFn",
+    "block_pattern_rule",
+    "warn_pattern_rule",
+    "sensitive_path_rule",
+    "task_alignment_rule",
+    "deobfuscate",
 ]
