@@ -73,6 +73,11 @@ from patterns.agent_guard import (
     ToolCallValidator,
     ValidationResult,
 )
+from patterns.mcp_pipe import (
+    HandleStore,
+    McpPipe,
+    ResultHandle,
+)
 
 __all__ = [
     "SlidingWindow",
@@ -118,4 +123,7 @@ __all__ = [
     "RateLimitRetrier",
     "ToolCallValidator",
     "ValidationResult",
+    "HandleStore",
+    "McpPipe",
+    "ResultHandle",
 ]
