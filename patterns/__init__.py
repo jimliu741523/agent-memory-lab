@@ -85,6 +85,13 @@ from patterns.tool_schema_compiler import (
     SchemaValidationError,
     ToolSchemaCompiler,
 )
+from patterns.mcp_agent_auth import (
+    DelegationChain,
+    DelegationEvent,
+    RevocationPropagator,
+    SigningKey,
+    SubAgentToken,
+)
 
 __all__ = [
     "SlidingWindow",
@@ -138,4 +145,9 @@ __all__ = [
     "OperatorType",
     "SchemaValidationError",
     "ToolSchemaCompiler",
+    "DelegationChain",
+    "DelegationEvent",
+    "RevocationPropagator",
+    "SigningKey",
+    "SubAgentToken",
 ]
