@@ -39,9 +39,13 @@ Reads as expected: the recency-only patterns drop the early fact; the two patter
 python -m bench.run                            # all patterns, table to stdout
 python -m bench.run --pattern sliding_window   # one pattern only
 python -m bench.run --output bench/results/results.md
+python -m bench.run --multi-seed 10            # variance across 10 filler shuffles
+python -m bench.run --model claude-sonnet-4-6  # real Anthropic model as summarize_fn
+                                                #   (requires ANTHROPIC_API_KEY + `pip install anthropic`)
+                                                #   only affects summary_compression + hierarchical_summary
 ```
 
-This is a micro-bench for legibility, not a ranking. It's not designed to argue any pattern is "best" — only to show the shape of each pattern's compromise.
+This is a micro-bench for legibility, not a ranking. It's not designed to argue any pattern is "best" — only to show the shape of each pattern's compromise. The default mock summarizers are deterministic and stdlib-only; `--model` swaps in a real LLM for the patterns that take a `summarize_fn` callback, letting you see whether the summarization quality (not just size) affects recall on your own corpora.
 
 ## Quickstart
 

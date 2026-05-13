@@ -142,10 +142,46 @@ def _run_sliding_window(script: list[tuple[str, str]]) -> Result:
     )
 
 
-def _run_summary_compression(script: list[tuple[str, str]]) -> Result:
-    def _summarize(msgs):
-        preview = " | ".join(m.content[:20] for m in msgs[:3])
-        return f"[{len(msgs)} earlier msgs; preview: {preview}]"
+def _make_real_summarize(model_name: str) -> Callable:
+    """
+    Build an Anthropic-API-backed summarize_fn. Lazy-imports `anthropic`
+    so this module still loads cleanly without the SDK installed when
+    the user is running default (mock) bench mode.
+    """
+    try:
+        import anthropic
+    except ImportError as e:
+        raise SystemExit(
+            "real-model mode requires the anthropic SDK: pip install anthropic"
+        ) from e
+    client = anthropic.Anthropic()  # picks up ANTHROPIC_API_KEY from env
+
+    def summarize(msgs):
+        body = "\n".join(f"[{m.role}] {m.content}" for m in msgs)
+        prompt = (
+            "Summarize the following conversation turns into one short paragraph. "
+            "Preserve specific facts (codes, names, numbers). Be terse.\n\n"
+            f"{body}"
+        )
+        resp = client.messages.create(
+            model=model_name,
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.content[0].text
+
+    return summarize
+
+
+def _run_summary_compression(script: list[tuple[str, str]], model_name: str | None = None) -> Result:
+    if model_name:
+        _summarize = _make_real_summarize(model_name)
+        note_suffix = f"real summarizer ({model_name})"
+    else:
+        def _summarize(msgs):
+            preview = " | ".join(m.content[:20] for m in msgs[:3])
+            return f"[{len(msgs)} earlier msgs; preview: {preview}]"
+        note_suffix = "mock summarizer"
 
     counting_summarize, counter = _counting(_summarize)
     mem = SummaryCompression(summarize=counting_summarize, trigger=20, keep=10)
@@ -158,13 +194,18 @@ def _run_summary_compression(script: list[tuple[str, str]]) -> Result:
         recall_raw=TARGET_FACT in text,
         context_chars=len(text),
         extra_calls=counter[0],
-        notes="trigger=20 keep=10 (mock summarizer)",
+        notes=f"trigger=20 keep=10 ({note_suffix})",
     )
 
 
-def _run_hierarchical_summary(script: list[tuple[str, str]]) -> Result:
-    def _summarize(msgs):
-        return f"<rollup of {len(msgs)}>"
+def _run_hierarchical_summary(script: list[tuple[str, str]], model_name: str | None = None) -> Result:
+    if model_name:
+        _summarize = _make_real_summarize(model_name)
+        note_suffix = f"real summarizer ({model_name})"
+    else:
+        def _summarize(msgs):
+            return f"<rollup of {len(msgs)}>"
+        note_suffix = "mock"
 
     counting_summarize, counter = _counting(_summarize)
     mem = HierarchicalSummary(
@@ -179,7 +220,7 @@ def _run_hierarchical_summary(script: list[tuple[str, str]]) -> Result:
         recall_raw=TARGET_FACT in text,
         context_chars=len(text),
         extra_calls=counter[0],
-        notes="leaf=10 fanout=3 keep_recent=5 (mock)",
+        notes=f"leaf=10 fanout=3 keep_recent=5 ({note_suffix})",
     )
 
 
@@ -282,9 +323,28 @@ def main() -> int:
         default=1,
         help="run N seeds (0..N-1) and report recall counts + char range per pattern",
     )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Anthropic model name (e.g. claude-sonnet-4-6). When set, "
+            "summary_compression and hierarchical_summary use the real "
+            "model as their summarize_fn instead of a mock. Requires "
+            "ANTHROPIC_API_KEY env var and `pip install anthropic`."
+        ),
+    )
     args = parser.parse_args()
 
     names = list(RUNNERS) if args.pattern == "all" else [args.pattern]
+
+    # Patterns that accept the model_name kwarg (summary-based ones).
+    _MODEL_AWARE = {"summary_compression", "hierarchical_summary"}
+
+    def _run_one(name: str, script):
+        runner = RUNNERS[name]
+        if args.model and name in _MODEL_AWARE:
+            return runner(script, model_name=args.model)
+        return runner(script)
 
     if args.multi_seed > 1:
         # aggregate across seeds 0..N-1
@@ -295,7 +355,7 @@ def main() -> int:
         for s in range(args.multi_seed):
             script = build_script(seed=s)
             for name in names:
-                r = RUNNERS[name](script)
+                r = _run_one(name, script)
                 if r.recall_raw:
                     recall_counts[name] += 1
                 char_ranges[name].append(r.context_chars)
@@ -316,10 +376,11 @@ def main() -> int:
         return 0
 
     script = build_script(seed=args.seed)
-    results = [RUNNERS[name](script) for name in names]
+    results = [_run_one(name, script) for name in names]
 
     rendered = render(results)
-    print(f"# agent-memory-lab recall bench ({len(script)} turns, target fact at turn 3, seed={args.seed})\n")
+    mode = f"model={args.model}" if args.model else "mock summarizers"
+    print(f"# agent-memory-lab recall bench ({len(script)} turns, target fact at turn 3, seed={args.seed}, {mode})\n")
     print(rendered)
 
     if args.output:
